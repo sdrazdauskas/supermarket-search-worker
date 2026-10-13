@@ -27,7 +27,9 @@ export function parseLidlProductsFromHtml(html: string): LidlProduct[] {
 		return s;
 	}
 
-	const chunks = html.split(/(?=<div[^>]*class="odsc-tile odsc-tile--variant-borderless[^"]*product-grid-box")/);
+	// One chunk per product tile. Matches any "odsc-tile" variant (Lidl has
+	// switched tile classes before), but not inner "odsc-tile__…" parts.
+	const chunks = html.split(/(?=<div[^>]*class="odsc-tile[ "])/);
 
 	for (const chunk of chunks) {
 		let id = '';
@@ -39,6 +41,8 @@ export function parseLidlProductsFromHtml(html: string): LidlProduct[] {
 		let url = '';
 		let pricePer = '';
 		let hasDiscount = false;
+		let lidlPlus = false;
+		let ians: string[] = [];
 		let matched = false;
 
 		const richMatch = chunk.match(/data-grid-data=(?:"([^"]+)"|'([^']+)')/);
@@ -52,7 +56,14 @@ export function parseLidlProductsFromHtml(html: string): LidlProduct[] {
 					brand = meta.brand?.name || '';
 					const priceObj = meta.price || {};
 					price = priceObj.price !== undefined ? String(priceObj.price) : '';
+					// Lidl Plus-only deals have no regular price, just the app price
+					const lidlPlusPrice = meta.lidlPlus?.[0]?.price?.price;
+					if (!price && lidlPlusPrice !== undefined) {
+						price = String(lidlPlusPrice);
+						lidlPlus = true;
+					}
 					oldPrice = priceObj.oldPrice ? String(priceObj.oldPrice) : '';
+					ians = Array.isArray(meta.ians) ? meta.ians.map(String) : [];
 					pricePer = priceObj.basePrice?.text || '';
 					img = meta.image || meta.image_V1?.image || '';
 					url = meta.canonicalPath || meta.canonicalUrl || '';
@@ -90,7 +101,7 @@ export function parseLidlProductsFromHtml(html: string): LidlProduct[] {
 		if (!id) continue;
 		if (url && !url.startsWith('http')) url = 'https://www.lidl.lt' + url;
 
-		products.push({ id, name, price, oldPrice, brand, img, url, hasDiscount, pricePer });
+		products.push({ id, name, price, oldPrice, brand, img, url, hasDiscount, pricePer, lidlPlus, ians, source: 'search' });
 	}
 
 	const seen = new Set<string>();

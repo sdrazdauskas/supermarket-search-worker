@@ -1,6 +1,7 @@
 import type { LidlProduct } from '../types';
 import { getCached, putCached, jsonResponse } from '../cache';
 import { parseLidlProductsFromHtml } from '../parsers/lidl';
+import { getCurrentFlyers, mergeFlyerOffers } from '../lidlFlyers';
 
 export async function handleLidlRoute(
 	request: Request,
@@ -21,11 +22,35 @@ export async function handleLidlRoute(
 	const query = body.query;
 	const maxPages = Math.max(1, Math.min(parseInt(String(body.maxPages)) || 3, 10));
 	const forceRefresh = !!body.forceRefresh || forceRefreshQS;
-	const cacheKey = `lidl:${query.toLowerCase()}:${maxPages}`;
+
+	// Search results and flyer offers are cached separately (flyers change more
+	// often while a new week's flyer is being read) and merged per request.
+	const [search, flyers] = await Promise.all([
+		getSearchProducts(query, maxPages, forceRefresh, env, ctx),
+		getCurrentFlyers(env, ctx, forceRefresh),
+	]);
+
+	const result = {
+		products: flyers ? mergeFlyerOffers(search.products, flyers.offers, query) : search.products,
+		// 'pending': a flyer is still being read, so flyer offers are incomplete;
+		// 'unavailable': the flyer tracker couldn't be reached, results are search-only
+		flyerStatus: !flyers ? 'unavailable' : flyers.pending ? 'pending' : 'done',
+	};
+	return jsonResponse(result, { 'X-Cache': search.cached ? 'HIT' : 'MISS' });
+}
+
+async function getSearchProducts(
+	query: string,
+	maxPages: number,
+	forceRefresh: boolean,
+	env: Env,
+	ctx: ExecutionContext
+): Promise<{ products: LidlProduct[]; cached: boolean }> {
+	const cacheKey = `lidl:v2:${query.toLowerCase()}:${maxPages}`; // v2: products carry `ians`/`source`/`lidlPlus`
 
 	if (!forceRefresh) {
 		const cached = await getCached<{ products: LidlProduct[] }>(env, cacheKey);
-		if (cached) return jsonResponse(cached, { 'X-Cache': 'HIT' });
+		if (cached) return { products: cached.products, cached: true };
 	}
 
 	// NOTE: this UA must be a complete, realistic browser string — a truncated
@@ -55,7 +80,6 @@ export async function handleLidlRoute(
 		return true;
 	});
 
-	const result = { products: allProducts };
-	putCached(env, ctx, cacheKey, result);
-	return jsonResponse(result, { 'X-Cache': 'MISS' });
+	putCached(env, ctx, cacheKey, { products: allProducts });
+	return { products: allProducts, cached: false };
 }
