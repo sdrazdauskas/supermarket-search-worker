@@ -8,7 +8,7 @@ import { getCached, putCached } from './cache';
 // API docs: "Lidl Price Tracker API: guide for UI developers".
 
 const CURRENT_FLYERS_URL = 'https://lidl-price-tracker.sh4rdknight.workers.dev/api/flyers/current';
-const CACHE_KEY = 'lidl-flyers:current';
+const CACHE_KEY = 'lidl-flyers:v2:current'; // v2: Lidl's flyers only
 // The tracker rebuilds this response after each processing run (every 15 min
 // while a new flyer is being read), so a longer TTL would show stale progress.
 const CACHE_TTL_SECONDS = 60 * 15;
@@ -39,7 +39,9 @@ interface TrackerOffer {
 }
 
 interface TrackerCurrentResponse {
-	flyers: { status: 'pending' | 'done' | 'failed'; offers: TrackerOffer[] }[];
+	// Flyers running today. The response also has `upcoming` (next week's flyers,
+	// published on Saturday), left out here so they don't mix with today's deals.
+	flyers: { store: 'lidl' | 'norfa'; status: 'pending' | 'done' | 'failed'; offers: TrackerOffer[] }[];
 }
 
 export interface CurrentFlyers {
@@ -63,9 +65,11 @@ export async function getCurrentFlyers(env: Env, ctx: ExecutionContext, forceRef
 		return null;
 	}
 
+	// The tracker also serves Norfa's flyers; only Lidl's belong in Lidl results
+	const flyers = data.flyers.filter((f) => f.store === 'lidl');
 	const result: CurrentFlyers = {
-		pending: data.flyers.some((f) => f.status === 'pending'),
-		offers: data.flyers.flatMap((f) => f.offers),
+		pending: flyers.some((f) => f.status === 'pending'),
+		offers: flyers.flatMap((f) => f.offers),
 	};
 	putCached(env, ctx, CACHE_KEY, result, CACHE_TTL_SECONDS);
 	return result;
