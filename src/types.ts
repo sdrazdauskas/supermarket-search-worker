@@ -59,9 +59,9 @@ export interface NorfaProduct {
 	pricePer: string; // per-unit text, e.g. "5,95 Eur/kg" — either scraped from the
 	// page's own note, or (when no note exists) the item's own price re-labeled
 	// as a per-unit value, since that's most often what it already is
-	// Shop note on how the price applies, e.g. "Nuolaida taikoma kasoje." (discount
-	// applied at the till) or "Taros užstato vertė į gėrimo kainą neįskaičiuota."
-	// (bottle deposit not included)
+	// Shop note on how the price applies, e.g. "Nuolaida taikoma kasoje" (discount
+	// applied at the till) or "Taros užstato vertė į gėrimo kainą neįskaičiuota"
+	// (bottle deposit not included). No final period.
 	note: string | null;
 	img: string;
 	// Raw ISO dates — deliberately NOT pre-computed into a status here, since the

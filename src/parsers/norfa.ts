@@ -39,14 +39,15 @@ function decodeEntities(s: string): string {
 }
 
 // The "more info" text before the validity date mixes a shop note
-// ("Nuolaida taikoma kasoje." — discount applied at the till) with repeats of
+// ("Nuolaida taikoma kasoje" — discount applied at the till) with repeats of
 // the product name, sometimes worded differently. The rewordings are dropped
-// by spotting their pack size ("…, 300 g", "1 pora").
+// by spotting their pack size ("…, 300 g", "1 pora"). Norfa prints the same
+// note with and without a final period, so that period is dropped too.
 function noteFrom(text: string): string | null {
 	const note = text
 		.replace(/\s+\./g, '.')
 		.replace(/\.{2,}/g, '.')
-		.replace(/^[\s.,]+|[\s,]+$/g, '');
+		.replace(/^[\s.,]+|[\s.,]+$/g, '');
 	if (!note || /\d\s*(?:k?g|m?l|vnt|lap|pora)\b/i.test(note)) return null;
 	return note;
 }

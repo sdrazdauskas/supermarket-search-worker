@@ -6,7 +6,7 @@ import { parseNorfaProductsFromHtml } from '../parsers/norfa';
 // so there's one shared cache entry for everyone; the client filters by
 // product name after fetching.
 export async function handleNorfaRoute(target: string, forceRefreshQS: boolean, env: Env, ctx: ExecutionContext): Promise<Response> {
-	const cacheKey = 'norfa:v2:praktiski-pasiulymai'; // v2: dates parsed again, `note` added
+	const cacheKey = 'norfa:v3:praktiski-pasiulymai'; // v3: dates parsed again, `note` added
 
 	if (!forceRefreshQS) {
 		const cached = await getCached<{ products: NorfaProduct[] }>(env, cacheKey);
