@@ -1,6 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { env, createExecutionContext, waitOnExecutionContext } from 'cloudflare:test';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { parseLidlProductsFromHtml } from '../src/parsers/lidl';
-import { mergeFlyerOffers } from '../src/lidlFlyers';
+import { getCurrentFlyers, mergeFlyerOffers } from '../src/lidlFlyers';
 
 // A search-result tile in lidl.lt's current markup, with its metadata JSON in
 // an HTML-escaped data-grid-data attribute
@@ -49,6 +50,50 @@ describe('parseLidlProductsFromHtml', () => {
 			['11255041', '1.39', false, ['19065']],
 			['11432516', '0.39', true, ['5576041']],
 		]);
+	});
+});
+
+describe('getCurrentFlyers', () => {
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	it("keeps only Lidl's flyers from the tracker", async () => {
+		vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+			Response.json({
+				flyers: [
+					{ store: 'lidl', status: 'done', offers: [offer({ product_id: '5576041', name: 'Pienas' })] },
+					{ store: 'norfa', status: 'pending', offers: [offer({ product_id: 'n273b7f1f', article_no: null, name: 'Pienas' })] },
+				],
+				upcoming: [],
+			})
+		);
+		const ctx = createExecutionContext();
+
+		const flyers = await getCurrentFlyers(env, ctx, true);
+		await waitOnExecutionContext(ctx);
+
+		expect(flyers?.offers.map((o) => o.product_id)).toEqual(['5576041']);
+		expect(flyers?.pending).toBe(false); // Norfa still being read doesn't make Lidl's results incomplete
+	});
+
+	it('keeps every flyer from a tracker that has no `store` field', async () => {
+		vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+			Response.json({
+				flyers: [
+					{ status: 'done', offers: [offer({ product_id: '5576041', name: 'Pienas' })] },
+					{ status: 'pending', offers: [offer({ product_id: '6211913', name: 'Fetos sūris' })] },
+				],
+				upcoming: [],
+			})
+		);
+		const ctx = createExecutionContext();
+
+		const flyers = await getCurrentFlyers(env, ctx, true);
+		await waitOnExecutionContext(ctx);
+
+		expect(flyers?.offers.map((o) => o.product_id)).toEqual(['5576041', '6211913']);
+		expect(flyers?.pending).toBe(true);
 	});
 });
 

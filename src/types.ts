@@ -46,8 +46,8 @@ export interface LidlFlyerOffer {
 	priceVerified: boolean | null; // false = price not found on the printed page, may be misread
 	pageUrl: string; // the flyer page in Lidl's online viewer
 	// The flyer has no separate product photos: show the product by cropping
-	// `pageImage` (a page JPEG hosted by Lidl) to `box`. `box` is approximate
-	// and null when the product couldn't be located on the page.
+	// `pageImage` (a page JPEG served by the tracker, kept after Lidl removes it)
+	// to `box`. `box` frames just the product's photo, not its name or price
 	pageImage: { url: string; width: number | null; height: number | null } | null;
 	box: { x: number; y: number; width: number; height: number } | null; // fractions (0–1) of the image, from the top-left
 }
@@ -59,6 +59,10 @@ export interface NorfaProduct {
 	pricePer: string; // per-unit text, e.g. "5,95 Eur/kg" — either scraped from the
 	// page's own note, or (when no note exists) the item's own price re-labeled
 	// as a per-unit value, since that's most often what it already is
+	// Shop note on how the price applies, e.g. "Nuolaida taikoma kasoje" (discount
+	// applied at the till) or "Taros užstato vertė į gėrimo kainą neįskaičiuota"
+	// (bottle deposit not included). No final period.
+	note: string | null;
 	img: string;
 	// Raw ISO dates — deliberately NOT pre-computed into a status here, since the
 	// worker response can sit in KV for hours. Status (upcoming/active/expired) is
