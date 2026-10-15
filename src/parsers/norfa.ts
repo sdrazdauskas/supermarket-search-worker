@@ -4,7 +4,7 @@ function pad(n: number): string {
 	return String(n).padStart(2, '0');
 }
 
-// Norfa's validity dates ("Galioja 10.15-10.28 d.") have no year, so we assume
+// Norfa's validity dates ("Galioja 07 17-07 19 d.") have no year, so we assume
 // the current year in Europe/Vilnius time, with a year-boundary-wrap check
 // (e.g. a "12 30-01 02" range spans into next year).
 function getVilniusToday(): { y: number; m: number; d: number } {
@@ -28,29 +28,6 @@ function fnv1a(str: string): string {
 	return hash.toString(16);
 }
 
-function decodeEntities(s: string): string {
-	return s
-		.replace(/&quot;/g, '"')
-		.replace(/&#0?39;/g, "'")
-		.replace(/&nbsp;/g, ' ')
-		.replace(/&lt;/g, '<')
-		.replace(/&gt;/g, '>')
-		.replace(/&amp;/g, '&');
-}
-
-// The "more info" text before the validity date mixes a shop note
-// ("Nuolaida taikoma kasoje." — discount applied at the till) with repeats of
-// the product name, sometimes worded differently. The rewordings are dropped
-// by spotting their pack size ("…, 300 g", "1 pora").
-function noteFrom(text: string): string | null {
-	const note = text
-		.replace(/\s+\./g, '.')
-		.replace(/\.{2,}/g, '.')
-		.replace(/^[\s.,]+|[\s,]+$/g, '');
-	if (!note || /\d\s*(?:k?g|m?l|vnt|lap|pora)\b/i.test(note)) return null;
-	return note;
-}
-
 // Norfa product parser — each product sits in its own
 // <div class="c-discount-item-list">...</div> block, with price, name, image,
 // and a "Galioja <start>-<end> d." (valid <start>-<end>) validity note.
@@ -68,31 +45,22 @@ export function parseNorfaProductsFromHtml(html: string): NorfaProduct[] {
 		const price = priceMatch ? priceMatch[1].replace('€', '').trim() : '';
 
 		const nameMatch = chunk.match(/c-product__name">([^<]+)</);
-		const name = nameMatch ? decodeEntities(nameMatch[1]).replace(/\s+/g, ' ').trim() : '';
+		const name = nameMatch ? nameMatch[1].replace(/\s+/g, ' ').trim() : '';
 
 		const infoMatch = chunk.match(/c-more-info__content">([\s\S]*?)<\/div>/);
 		let pricePer = '';
-		let note: string | null = null;
 		let validFrom: string | null = null;
 		let validTo: string | null = null;
 
 		if (infoMatch) {
-			const normalized = decodeEntities(infoMatch[1].replace(/<br\s*\/?>/gi, ' '))
+			const normalized = infoMatch[1]
+				.replace(/<br\s*\/?>/gi, ' ')
 				.replace(/\s+/g, ' ')
 				.trim();
-			// "Galioja 10.15-10.28 d."; older pages used spaces ("Galioja 07 17-07 19 d.")
-			const dateMatch = normalized.match(/Galioja\s+(\d{2})[.\s](\d{2})\s*-\s*(\d{2})[.\s](\d{2})\s*d\.?/);
-			let info = dateMatch ? normalized.slice(0, dateMatch.index) : normalized;
-
-			const unitPriceMatch = info.match(/\d+(?:,\d+)?\s*Eur\/\s*[a-zšž.]+/i); // "7,92 Eur/kg"
-			if (unitPriceMatch) {
-				pricePer = unitPriceMatch[0];
-				info = info.replace(unitPriceMatch[0], '');
-			}
-			if (name) info = info.split(name).join('');
-			note = noteFrom(info);
-
+			const dateMatch = normalized.match(/Galioja\s+(\d{2})\s+(\d{2})-(\d{2})\s+(\d{2})\s*d\.?/);
 			if (dateMatch) {
+				pricePer = normalized.slice(0, dateMatch.index).trim();
+
 				const startMonth = parseInt(dateMatch[1], 10);
 				const startDay = parseInt(dateMatch[2], 10);
 				const endMonth = parseInt(dateMatch[3], 10);
@@ -106,6 +74,8 @@ export function parseNorfaProductsFromHtml(html: string): NorfaProduct[] {
 				}
 				validFrom = `${startYear}-${pad(startMonth)}-${pad(startDay)}`;
 				validTo = `${endYear}-${pad(endMonth)}-${pad(endDay)}`;
+			} else {
+				pricePer = normalized;
 			}
 		}
 
@@ -121,7 +91,7 @@ export function parseNorfaProductsFromHtml(html: string): NorfaProduct[] {
 		}
 
 		const id = fnv1a(`${name}|${price}|${validFrom ?? ''}|${validTo ?? ''}`);
-		products.push({ id, name, price, pricePer, note, img, validFrom, validTo });
+		products.push({ id, name, price, pricePer, img, validFrom, validTo });
 	}
 
 	return products;
