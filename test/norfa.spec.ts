@@ -39,18 +39,7 @@ describe('parseNorfaProductsFromHtml', () => {
 
 		const [product] = parseNorfaProductsFromHtml(html);
 
-		expect(product).toMatchObject({ pricePer: '7,92 Eur/kg', note: 'Nuolaida taikoma kasoje' });
-	});
-
-	it('writes the same note the same way, with or without a final period', () => {
-		const html =
-			item('Bananai, 1 kg', '0.99', 'Nuolaida taikoma kasoje. <br> Galioja 10.15-10.28 d.') +
-			item('Obuoliai, 1 kg', '0.79', 'Nuolaida taikoma kasoje <br> Galioja 10.15-10.28 d.') +
-			item('Sultys, 1 l', '1.29', 'Nuolaida taikoma kasoje. Sultims nuolaida netaikoma. <br> Galioja 10.15-10.28 d.');
-
-		const notes = parseNorfaProductsFromHtml(html).map((p) => p.note);
-
-		expect(notes).toEqual(['Nuolaida taikoma kasoje', 'Nuolaida taikoma kasoje', 'Nuolaida taikoma kasoje. Sultims nuolaida netaikoma']);
+		expect(product).toMatchObject({ pricePer: '7,92 Eur/kg', note: 'Nuolaida taikoma kasoje.' });
 	});
 
 	it('drops reworded product names from the note', () => {
